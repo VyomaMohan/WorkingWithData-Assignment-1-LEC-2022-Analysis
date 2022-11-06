@@ -1,0 +1,87 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+#IDE: R studio (R Notebook)
+#OS: Windows 11
+
+#This R Notebook has been used to generate the excels for result data and streams data
+
+#We need not run this notebook to run the analysis. It is used one time to get the excels
+
+library(rvest)
+library(stringr)
+
+#First table extraction for webpage
+
+#Summer playoffs standings
+
+#Get data from the url
+playoffs_url <- "https://escorenews.com/en/lol/lec-2022-summer"
+po_wbpage <- read_html(url(playoffs_url))
+po_tablenode <- html_nodes(po_wbpage,"table")
+playoffs_table <-html_table(po_tablenode[[12]])
+#Rename columns to proper names
+colnames(playoffs_table) <- c("FinalRank","Team","Qualified","Prize")
+```
+```{r}
+
+#Second table extraction
+
+#Summer groups stage standings
+
+#Get data from url
+round_robin_url <- "https://escorenews.com/en/lol/lec-2022-summer/group-stage"
+rr_wbpage <- read_html(url(round_robin_url))
+rr_tablenode <- html_nodes(rr_wbpage,"table")
+round_robin_table <-html_table(rr_tablenode[[1]])
+#Rename columns to proper names
+colnames(round_robin_table) <- c("Num","TeamFull","Games","Wins","D","Losses","Pts","Diff")
+#Remove unnecessary columns
+round_robin_table <- subset(round_robin_table, select = -c(D,Num))
+
+#Make a column "Team" to help join this table with the first table
+round_robin_table$Team <- word(round_robin_table$TeamFull, 1)
+
+#Join the first and second table by outer join
+#This is the table that will contain all the standings data
+joint_table <- merge(x = round_robin_table, y = playoffs_table, by = "Team", all = TRUE)
+
+#Write to excel
+write.csv(joint_table,"LECSummer2022Results.csv", row.names = TRUE)
+
+```
+
+
+```{r}
+
+#Third table extraction
+
+#Stream views for the season
+
+#Get data from url
+#This gives all streams for LEC's twitch channel
+twitch_data_url <- "https://twitchtracker.com/lec/streams"
+twitch_data_wbpage <- read_html(url(twitch_data_url))
+t_tablenode <- html_nodes(twitch_data_wbpage,"table")
+twitch_stream_table <-html_table(t_tablenode[[1]])
+
+#Get the rows related to summer split alone
+summer_split_streams <- tail(twitch_stream_table,n=51)
+
+#Remove unnecessary columns
+summer_split_streams <- subset(summer_split_streams, select = -c(Views,Games))
+
+#Use regex to find which teams are playing from the title
+summer_split_streams_vs <- transform(summer_split_streams,teams = gsub("\\.", "", str_extract(Title,"[\\w]+ vs[.]* [\\w]+")))
+#The finals stream doesn't have the teams playing in the title, so filling that cell
+summer_split_streams_vs$teams[50] <- "G2 vs RGE"
+
+#Write to excel
+write.csv(summer_split_streams_vs,"LECSummer2022Streams.csv", row.names = TRUE)
+
+```
+
